@@ -61,19 +61,19 @@ def loadData():
     with open(splitsCSV, 'r') as file:
         csvreader = csv.reader(file)
         rows = list(csvreader)
-        header = rows[0]
+        header = list(map(int, rows[0]))
         data = rows[1:]
-        splits = pd.DataFrame(data, index=["A",10,9,8,7,6,5,4,3,2],columns=header)
+        splits = pd.DataFrame(data, index=[14,10,9,8,7,6,5,4,3,2],columns=header)
     with open(softTotalsCSV, 'r') as file:
         csvreader = csv.reader(file)
         rows = list(csvreader)
-        header = rows[0]
+        header = list(map(int, rows[0]))
         data = rows[1:]
         softTotals = pd.DataFrame(data, index=[20,19,18,17,16,15,14,13],columns=header)
     with open(hardTotalsCSV, 'r') as file:
         csvreader = csv.reader(file)
         rows = list(csvreader)
-        header = rows[0]
+        header = list(map(int, rows[0]))
         data = rows[1:]
 
         hardTotals = pd.DataFrame(data, index=[17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2],columns=header)
@@ -99,8 +99,21 @@ def bulidGameHands(gameCards):
 
 
 
-def calculatePlayerValues(cards,  *recursive):
-    pass
+def determinePlayerAction(cards, dealerCard,  *recursive):
+    handTotal = 0
+    for card in cards:
+        #Add a case to resolve soft and hard aces
+        if card <= 10:
+            handTotal += card
+        if card > 10:
+            handTotal += 10
+    if handTotal > 17:
+        handTotal = 17
+    if dealerCard > 10 and dealerCard < 14:
+        dealerCard = 10
+
+    #return a enumerated number to denote stand, hit, double, split
+    return hardTotals[dealerCard][handTotal]
 
 def dealerAction(cards, *endOfGame):
     pass
@@ -125,7 +138,6 @@ def hit(cardsInDeck:list, currentCards):
 def trimSuit(hand):
     for i in range(len(hand)):
         hand[i] = int(hand[i][:-1])  # Remove last character (suit)
-    print(hand)
     return hand
     
 
@@ -158,22 +170,28 @@ def makeHumanReadable(hands):
     return returnHands
 
 def playGame():
+    global splits,softTotals,hardTotals
     splits,softTotals,hardTotals = loadData()
     gameDeck = buildGameDeck()
     gameHands = bulidGameHands(gameDeck)
     print(gameDeck)
     print(gameHands)
     readAbleHand = makeHumanReadable(gameHands)
-    dealerHand = readAbleHand[0]
+    dealerHand = trimSuit(gameHands[0])
     playerHands = gameHands[1:]
     print("Start Game!")
     print("Readable Hands:")
-    dealerValue = sorted(dealerHand, key=lambda x:cards.index(x))[0]
+    dealerValue = dealerHand[0]
     print(f'Dealer shows: {dealerValue}')
-    for i in range(len(gameHands)-1, -1, -1):
+    #Stopping iteration at 0 results in dealers hand not being resolved in this set of game actions
+    for i in range(len(gameHands)-1, 0, -1):
         hand = trimSuit(gameHands[i])
-        #print(hand)
-        #sortedHand = sorted(currentHand, key=lambda x:cards.index(x))
+        sortedHand = sorted(hand, reverse=True)
+        print(sortedHand)
+        #Method summizes cards, uses tables and current siutaitons to determine game action
+        action = determinePlayerAction(sortedHand, dealerValue)
+        
+        #Method to resolve game action
 
         #False parameter is preset, changed to deal with ace H/L
 
