@@ -19,7 +19,7 @@ softTotalsCSV = os.path.join('data','softTotals.csv')
 splitsCSV = os.path.join('data', 'splits.csv')
 
 
-deckCount = 4
+deckCount = 1
 playerCount = 5
 cards = ["A","K","Q","J","10","9","8","7","6","5","4","3","2"]
 suits = ["Spades", "Clubs", "Diamonds", "Hearts"]
@@ -101,37 +101,44 @@ def bulidGameHands(gameCards):
 #Not very good in time efficency 
 
 
+#Logic does not work with multiple aces, need fix
+def dealerAction(cards, deck):
+    print(cards)
+    handTotal = 0
+    while handTotal < 17:
+        handTotal = calculateTotals(cards)
+        if handTotal < 17:
+            cards, deck = hit(cards, deck)
+            print(cards[-1])
+            cards[-1] = int(cards[-1][:-1])
 
-def dealerAction(cards, *endOfGame):
-    pass
+    return cards, handTotal
+
 
 
 def doubleDown():
     pass
 
 #Take dealer card, total, determine winners and losers, money
-def resolveGame(hands):
+def resolveGame(dealer, players):
     results= []
-    dealerHand = hands[0]
-    dealerTotal = calculateTotals(dealerHand)
-    playerHands = hands[1:]
+    dealerTotal = dealer
+    print(dealer, players)
+    playerHands = players
     for hand in playerHands:
         playerTotal = calculateTotals(hand)
         if playerTotal == dealerTotal and playerTotal <= 21:
-            results.append("Push")
-        elif playerTotal > 21:
-            results.append("Bust")
+            results.append(["Push", hand])
+        elif playerTotal >= 22:
+            results.append(["Bust", hand])
         elif playerTotal == 21 and len(hand) == 2 and dealerTotal != 21:
-            results.append("Blackjack")
+            results.append(["Blackjack", hand])
         elif playerTotal < dealerTotal and playerTotal < 21 and dealerTotal < 22:
-            results.append("Lost")
-        elif playerTotal < 22 and playerTotal > dealerTotal:
-            results.append("Win")
+            results.append(["Lost", hand])
+        elif (playerTotal < 22 and playerTotal > dealerTotal) or (playerTotal < 22 and dealerTotal > 21):
+            results.append(["Win", hand])
     return results
         
-    print(dealerHand)
-    print(playerHands)
-    pass
 #take gameHands[X], create gameHands[Y], gameHands[Z] with X 0 and 1 being 0 in both hands, add new cards to 
 #seen cards resolve game hand 1 in loop, game hand 2 should finish while checking the list
 def splitHands(hands, gameCards):
@@ -200,6 +207,7 @@ def playGame():
                 seenCards[card] += 1
             else:
                 seenCards[card] = 1
+    print(f'dealerCard {gameHands[0][0]}')
     if gameHands[0][0] in seenCards:
         seenCards[gameHands[0][0]] += 1
     elif gameHands[0][0] not in seenCards:
@@ -208,25 +216,27 @@ def playGame():
     readAbleHand = makeHumanReadable(gameHands)
     dealerHand = trimSuit(gameHands[0])
     playerHands = gameHands[1:]
-    print("Readable Hands:")
     dealerValue = dealerHand[0]
     print(f'Dealer shows: {dealerValue}')
     #Stopping iteration at 0 results in dealers hand not being resolved in this set of game actions
-    for i in range(len(gameHands)-1, 0, -1):
-        hand = trimSuit(gameHands[i])
+    for i in range(len(playerHands)):
+        hand = trimSuit(playerHands[i])
         sortedHand = sorted(hand, reverse=True)
-        print(sortedHand)
         #Method summizes cards, uses tables and current siutaitons to determine game action
         action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
-        print(action)
         if action == 1:
             while action == 1:
                 hand, gameDeck = hit(sortedHand, gameDeck)
+                print(hand[-1])
+                if hand[-1] in seenCards:
+                    seenCards[hand[-1]] += 1
+                else:
+                    seenCards[hand[-1]] = 1
+                print("Seen cards")
+                print(seenCards)
                 hand[-1] = int(hand[-1][:-1])
                 sortedHand = sorted(hand, reverse=True)
                 action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
-                print(sortedHand)
-                print(action)
                 gameHands[i] = sortedHand
         #Resolve action = 2
         elif action == 3:
@@ -248,8 +258,14 @@ def playGame():
                         sortedHand = sorted(hand, reverse=True)
                         action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
                 gameHands.append(hand)
-    
-    results = resolveGame(gameHands)
+    dealerHand, dealerTotal = dealerAction(dealerHand, gameDeck)
+    dealerTotal = int(dealerTotal)
+    print(dealerHand)
+    print(dealerTotal)
+    print(len(seenCards))
+    print(seenCards)
+    results = resolveGame(dealerTotal, gameHands[1:])
+    print(f'dealer endeed with {dealerTotal}')
     print(results)
     #resolve dealer last card, 
     for i in range(len(gameHands)):
@@ -259,7 +275,6 @@ def playGame():
         seenCards[hiddenCard] += 1
     else:
         seenCards[hiddenCard] = 1
-    print(seenCards)
         #False parameter is preset, changed to deal with ace H/L
 
 #compare cards, determine split, determine soft or hard total, then determine action, take actinos as neceesary

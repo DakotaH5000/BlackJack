@@ -10,6 +10,8 @@ def calculateTotals(hand):
         elif card >= 10 < 14:
             handTotal += 10
     if subtract:
+        if handTotal < 22:
+            return handTotal
         return handTotal - 10
     else:
         return handTotal
