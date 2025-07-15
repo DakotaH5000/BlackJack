@@ -19,7 +19,7 @@ def determinePlayerAction(cards, dealerCard, hardTotals, softTotals, splits):
     elif cards[0] == 14:
         #Max of one hard ace, code it in, if hand exceeds 21, reduce by 10 to soften ace
         handTotal += 10
-        if cards[1] > 10 < 14 and len(cards) == 2:
+        if 10 <= cards[1] < 14 and len(cards) == 2:
             return "BlackJack"
         for card in cards:
             #Add a case to resolve soft and hard aces

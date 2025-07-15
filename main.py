@@ -110,7 +110,7 @@ def dealerAction(cards, deck):
         if handTotal < 17:
             cards, deck = hit(cards, deck)
             print(cards[-1])
-            cards[-1] = int(cards[-1][:-1])
+            cards = trimSuit(cards)
 
     return cards, handTotal
 
@@ -156,12 +156,20 @@ def hit(hand:list, cardsInDeck:list):
     hitCard = random.sample(cardsInDeck, 1)[0]
     hand.append(hitCard)
     cardsInDeck.remove(hitCard)
-
     return hand, cardsInDeck
 
 def trimSuit(hand):
     for i in range(len(hand)):
-        hand[i] = int(hand[i][:-1])  # Remove last character (suit)
+        try:
+            if isinstance(hand[i], str):
+                hand[i] = int(hand[i][:-1])  # Remove last character (suit)
+        #These errors should never be raised unless something is crazy broken
+        except ValueError:
+                raise ValueError(f"Cannot convert card value '{hand[i][:-1]}' to int")
+        except Exception as e:
+                # Catch unexpected errors and re-raise with context
+                raise RuntimeError(f"Error processing card '{hand[i]}': {e}")
+
     return hand
     
 
@@ -234,7 +242,7 @@ def playGame():
                     seenCards[hand[-1]] = 1
                 print("Seen cards")
                 print(seenCards)
-                hand[-1] = int(hand[-1][:-1])
+                hand = trimSuit(hand)
                 sortedHand = sorted(hand, reverse=True)
                 action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
                 gameHands[i] = sortedHand
@@ -254,7 +262,7 @@ def playGame():
                 if action == 1:
                     while action == 1:
                         hand, gameDeck = hit(sortedHand, gameDeck)
-                        hand[-1] = int(hand[-1][:-1])
+                        hand = trimSuit(hand)
                         sortedHand = sorted(hand, reverse=True)
                         action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
                 gameHands.append(hand)
@@ -283,4 +291,5 @@ def playGame():
 
 #compare hands and run simulation
 
-playGame()
+if __name__ == "__main__":
+    playGame()
