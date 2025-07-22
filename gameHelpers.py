@@ -1,3 +1,5 @@
+from data.datatypes import cardsQuantity, suits
+
 def calculateTotals(hand):
     handTotal = 0
     subtract = False
@@ -17,3 +19,14 @@ def calculateTotals(hand):
         return handTotal
     else:
         return handTotal
+
+
+#Set the number of cards properly
+def buildGameDeck(numDecks):
+    availableCards= []
+    for key in cardsQuantity:
+        for suit in suits:
+                cardsQuantity[key][suit] *= numDecks
+                for card in range(0,cardsQuantity[key][suit]):
+                    availableCards.append(f'{key}{suit[0]}')
+    return availableCards

@@ -3,8 +3,11 @@ import csv
 import pandas as pd
 import numpy as np
 import random
+from data.datatypes import cardsQuantity,cards,suits,letterToSuit,cardValues
 from gameAction import determinePlayerAction
-from gameHelpers import calculateTotals
+from gameHelpers import calculateTotals, buildGameDeck
+from calculateCurrentOdds import estimate_decks_confidence
+from calculatedOddsActions import determine_action_odds
 
 ##A big question while building this is it better to pass integers such as 113 for King or just pass the value of
 #K and convert that to a 10.  
@@ -13,48 +16,23 @@ from gameHelpers import calculateTotals
 global hardTotals; pd.DataFrame()
 softTotals = pd.DataFrame()
 splits = pd.DataFrame()
+seen_cards= {}
 #import files
 hardTotalsCSV = os.path.join('data','hardTotals.csv')
 softTotalsCSV = os.path.join('data','softTotals.csv')
 splitsCSV = os.path.join('data', 'splits.csv')
 
 
-deckCount = 1
+deckCount = random.randint(1,10)
 playerCount = 5
-cards = ["A","K","Q","J","10","9","8","7","6","5","4","3","2"]
-suits = ["Spades", "Clubs", "Diamonds", "Hearts"]
-letterToSuit = {"S":"Spades", "C":"Clubs", "D":"Diamonds", "H":"Hearts"}
-cardValues = [[1,11],10,10,10,10,9,8,7,6,5,4,3,2,1]
+
 
 
 #Player status will hold a stood, hit or bust statement for each player
 playerStatus=[]
 
-cardsQuantity = {
-    14:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    13:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    12:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    11:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    10:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    9:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    8:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    7:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    6:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    5:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    4:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    3:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1},
-    2:{"Spades":1, "Clubs":1, "Diamonds": 1, "Hearts":1}
-}
 
-#Set the number of cards properly
-def buildGameDeck():
-    availableCards= []
-    for key in cardsQuantity:
-        for suit in suits:
-                cardsQuantity[key][suit] *= deckCount
-                for card in range(0,cardsQuantity[key][suit]):
-                    availableCards.append(f'{key}{suit[0]}')
-    return availableCards
+
 
     
 
@@ -87,7 +65,7 @@ def loadData():
 
 #hands generates the numerical representation of the game state, readable hand provides a user readable interface to better understand game states and actions
 #Generates card without suit
-def bulidGameHands(gameCards):
+def build_game_hands(gameCards):
     hands = []
     for player in range(0, playerCount + 1):
         hand = random.sample(gameCards, 2)
@@ -110,7 +88,7 @@ def dealerAction(cards, deck):
         if handTotal < 17:
             cards, deck = hit(cards, deck)
             print(cards[-1])
-            cards = trimSuit(cards)
+            cards[-1] = int(cards[-1][:-1])
 
     return cards, handTotal
 
@@ -156,6 +134,7 @@ def hit(hand:list, cardsInDeck:list):
     hitCard = random.sample(cardsInDeck, 1)[0]
     hand.append(hitCard)
     cardsInDeck.remove(hitCard)
+
     return hand, cardsInDeck
 
 def trimSuit(hand):
@@ -171,6 +150,7 @@ def trimSuit(hand):
                 raise RuntimeError(f"Error processing card '{hand[i]}': {e}")
 
     return hand
+
     
 
 def makeHumanReadable(hands):
@@ -200,96 +180,106 @@ def makeHumanReadable(hands):
         returnHands.append(cardValueNoSuit)
     return returnHands
 
-def playGame():
-    seenCards = {}
+def gameSetup(deckCount):
     global splits,softTotals,hardTotals
     splits,softTotals,hardTotals = loadData()
-    gameDeck = buildGameDeck()
-    gameHands = bulidGameHands(gameDeck)
-    print(gameHands)
-    hiddenCard = gameHands[0][1]
-    #handle player hands as then dealer first card
-    for i in range(len(gameHands)-1, 0, -1):
-        for card in gameHands[i]:
-            if card in seenCards:
-                seenCards[card] += 1
-            else:
-                seenCards[card] = 1
-    print(f'dealerCard {gameHands[0][0]}')
-    if gameHands[0][0] in seenCards:
-        seenCards[gameHands[0][0]] += 1
-    elif gameHands[0][0] not in seenCards:
-        seenCards[gameHands[0][0]] = 1
-    
-    readAbleHand = makeHumanReadable(gameHands)
-    dealerHand = trimSuit(gameHands[0])
-    playerHands = gameHands[1:]
-    dealerValue = dealerHand[0]
-    print(f'Dealer shows: {dealerValue}')
-    #Stopping iteration at 0 results in dealers hand not being resolved in this set of game actions
-    for i in range(len(playerHands)):
-        hand = trimSuit(playerHands[i])
-        sortedHand = sorted(hand, reverse=True)
-        #Method summizes cards, uses tables and current siutaitons to determine game action
-        action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
-        if action == 1:
-            while action == 1:
-                hand, gameDeck = hit(sortedHand, gameDeck)
-                print(hand[-1])
-                if hand[-1] in seenCards:
-                    seenCards[hand[-1]] += 1
+    gameDeck = buildGameDeck(deckCount)
+
+    return splits,softTotals,hardTotals, gameDeck
+
+def playGame(games):
+    currentGame = 0
+    while currentGame < games :
+        global splits,softTotals,hardTotals, gameDeck
+        if currentGame == 0:
+            splits,softTotals,hardTotals, gameDeck = gameSetup(deckCount)
+        gameHands = build_game_hands(gameDeck)
+        print(gameHands)
+        hiddenCard = gameHands[0][1]
+        #handle player hands as then dealer first card
+        for i in range(len(gameHands)-1, 0, -1):
+            for card in gameHands[i]:
+                if card in seen_cards:
+                    seen_cards[card] += 1
                 else:
-                    seenCards[hand[-1]] = 1
-                print("Seen cards")
-                print(seenCards)
-                hand = trimSuit(hand)
-                sortedHand = sorted(hand, reverse=True)
-                action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
-                gameHands[i] = sortedHand
-        #Resolve action = 2
-        elif action == 3:
-            gameHands.remove(hand)
-            postSplit = splitHands(sortedHand, gameDeck)
-            for i in range(len(postSplit)):
-                hand = postSplit[i]
-                if hand[1] in seenCards:
-                    seenCards[hand[1]] += 1
-                else:
-                    seenCards[hand[1]] = 1
-                hand[1] = int(hand[1][:-1])
-                sortedHand = sorted(hand, reverse=True)
-                action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
-                if action == 1:
-                    while action == 1:
-                        hand, gameDeck = hit(sortedHand, gameDeck)
-                        hand = trimSuit(hand)
-                        sortedHand = sorted(hand, reverse=True)
-                        action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
-                gameHands.append(hand)
-    dealerHand, dealerTotal = dealerAction(dealerHand, gameDeck)
-    dealerTotal = int(dealerTotal)
-    print(dealerHand)
-    print(dealerTotal)
-    print(len(seenCards))
-    print(seenCards)
-    results = resolveGame(dealerTotal, gameHands[1:])
-    print(f'dealer endeed with {dealerTotal}')
-    print(results)
-    #resolve dealer last card, 
-    for i in range(len(gameHands)):
-        gameHands[i] = sorted(gameHands[i], reverse=True)
-    print(gameHands)
-    if gameHands[0][1] in seenCards:
-        seenCards[hiddenCard] += 1
-    else:
-        seenCards[hiddenCard] = 1
-        #False parameter is preset, changed to deal with ace H/L
+                    seen_cards[card] = 1
+        print(f'dealerCard {gameHands[0][0]}')
+        if gameHands[0][0] in seen_cards:
+            seen_cards[gameHands[0][0]] += 1
+        elif gameHands[0][0] not in seen_cards:
+            seen_cards[gameHands[0][0]] = 1
+        
+        readAbleHand = makeHumanReadable(gameHands)
+        dealerHand = trimSuit(gameHands[0])
+        playerHands = gameHands[1:]
+        dealerValue = dealerHand[0]
+        print(f'Dealer shows: {dealerValue}')
+        #Stopping iteration at 0 results in dealers hand not being resolved in this set of game actions
+        for i in range(len(playerHands)):
+            hand = trimSuit(playerHands[i])
+            sortedHand = sorted(hand, reverse=True)
+            #Method summizes cards, uses tables and current siutaitons to determine game action
+            action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
+            if action == 1:
+                while action == 1:
+                    hand, gameDeck = hit(sortedHand, gameDeck)
+                    print(hand[-1])
+                    if hand[-1] in seen_cards:
+                        seen_cards[hand[-1]] += 1
+                    else:
+                        seen_cards[hand[-1]] = 1
+                    print("Seen cards")
+                    print(seen_cards)
+                    hand = trimSuit(hand)
+                    sortedHand = sorted(hand, reverse=True)
+                    action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
+                    gameHands[i] = sortedHand
+            #Resolve action = 2
+            elif action == 3:
+                gameHands.remove(hand)
+                postSplit = splitHands(sortedHand, gameDeck)
+                for i in range(len(postSplit)):
+                    hand = postSplit[i]
+                    if hand[1] in seen_cards:
+                        seen_cards[hand[1]] += 1
+                    else:
+                        seen_cards[hand[1]] = 1
+                    hand[1] = int(hand[1][:-1])
+                    sortedHand = sorted(hand, reverse=True)
+                    action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
+                    if action == 1:
+                        while action == 1:
+                            hand, gameDeck = hit(sortedHand, gameDeck)
+                            hand[-1] = int(hand[-1][:-1])
+                            sortedHand = sorted(hand, reverse=True)
+                            action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
+                    gameHands.append(hand)
+        dealerHand, dealerTotal = dealerAction(dealerHand, gameDeck)
+        dealerTotal = int(dealerTotal)
+        results = resolveGame(dealerTotal, gameHands[1:])
+        print(f'dealer endeed with {dealerTotal}')
+        print(results)
+        #resolve dealer last card, 
+        for i in range(len(gameHands)):
+            gameHands[i] = sorted(gameHands[i], reverse=True)
+        print(gameHands)
+        #print(estimate_decks_confidence(seen_cards, 10))
+        probabilites = estimate_decks_confidence(seen_cards,10)["probabilities"]
+        determine_action_odds(probabilites, seen_cards)
 
-#compare cards, determine split, determine soft or hard total, then determine action, take actinos as neceesary
+        print(probabilites)
+        print(deckCount)
+        if gameHands[0][1] in seen_cards:
+            seen_cards[hiddenCard] += 1
+        else:
+            seen_cards[hiddenCard] = 1
+            #False parameter is preset, changed to deal with ace H/L
+        currentGame+=1
 
-#generate hands
+    #compare cards, determine split, determine soft or hard total, then determine action, take actinos as neceesary
 
-#compare hands and run simulation
+    #generate hands
 
-if __name__ == "__main__":
-    playGame()
+    #compare hands and run simulation
+
+playGame(6)

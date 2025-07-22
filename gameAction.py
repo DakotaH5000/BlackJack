@@ -40,7 +40,6 @@ def determinePlayerAction(cards, dealerCard, hardTotals, softTotals, splits):
             return int(hardTotals[dealerCard][handTotal])
         if handTotal == 21:
             return 0
-        print(handTotal)
         return int(softTotals[dealerCard][handTotal])
     #Default play loop
     else:
