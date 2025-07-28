@@ -5,7 +5,7 @@ import numpy as np
 import random
 from data.datatypes import cardsQuantity,cards,suits,letterToSuit,cardValues
 from gameAction import determinePlayerAction
-from gameHelpers import calculateTotals, buildGameDeck
+from gameHelpers import calculate_totals, build_game_deck
 from calculateCurrentOdds import estimate_decks_confidence
 from calculatedOddsActions import determine_action_odds
 
@@ -84,7 +84,7 @@ def dealerAction(cards, deck):
     print(cards)
     handTotal = 0
     while handTotal < 17:
-        handTotal = calculateTotals(cards)
+        handTotal = calculate_totals(cards)
         if handTotal < 17:
             cards, deck = hit(cards, deck)
             print(cards[-1])
@@ -104,7 +104,7 @@ def resolveGame(dealer, players):
     print(dealer, players)
     playerHands = players
     for hand in playerHands:
-        playerTotal = calculateTotals(hand)
+        playerTotal = calculate_totals(hand)
         if playerTotal == dealerTotal and playerTotal <= 21:
             results.append(["Push", hand])
         elif playerTotal >= 22:
@@ -183,7 +183,7 @@ def makeHumanReadable(hands):
 def gameSetup(deckCount):
     global splits,softTotals,hardTotals
     splits,softTotals,hardTotals = loadData()
-    gameDeck = buildGameDeck(deckCount)
+    gameDeck = build_game_deck(deckCount)
 
     return splits,softTotals,hardTotals, gameDeck
 
@@ -194,8 +194,11 @@ def playGame(games):
         if currentGame == 0:
             splits,softTotals,hardTotals, gameDeck = gameSetup(deckCount)
         gameHands = build_game_hands(gameDeck)
-        print(gameHands)
+
+        #print(gameHands)
+
         hiddenCard = gameHands[0][1]
+
         #handle player hands as then dealer first card
         for i in range(len(gameHands)-1, 0, -1):
             for card in gameHands[i]:
@@ -203,7 +206,9 @@ def playGame(games):
                     seen_cards[card] += 1
                 else:
                     seen_cards[card] = 1
-        print(f'dealerCard {gameHands[0][0]}')
+
+
+        #Include dealer face-up card in observations
         if gameHands[0][0] in seen_cards:
             seen_cards[gameHands[0][0]] += 1
         elif gameHands[0][0] not in seen_cards:
@@ -213,23 +218,24 @@ def playGame(games):
         dealerHand = trimSuit(gameHands[0])
         playerHands = gameHands[1:]
         dealerValue = dealerHand[0]
-        print(f'Dealer shows: {dealerValue}')
+        #print(f'Dealer shows: {dealerValue}')
         #Stopping iteration at 0 results in dealers hand not being resolved in this set of game actions
         for i in range(len(playerHands)):
             hand = trimSuit(playerHands[i])
             sortedHand = sorted(hand, reverse=True)
-            #Method summizes cards, uses tables and current siutaitons to determine game action
+
+            probabilites = estimate_decks_confidence(seen_cards,10)["probabilities"]
+            computedAction = determine_action_odds(probabilites, seen_cards, sortedHand, dealerValue)
+
+
             action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
             if action == 1:
                 while action == 1:
                     hand, gameDeck = hit(sortedHand, gameDeck)
-                    print(hand[-1])
                     if hand[-1] in seen_cards:
                         seen_cards[hand[-1]] += 1
                     else:
                         seen_cards[hand[-1]] = 1
-                    print("Seen cards")
-                    print(seen_cards)
                     hand = trimSuit(hand)
                     sortedHand = sorted(hand, reverse=True)
                     action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
@@ -257,24 +263,22 @@ def playGame(games):
         dealerHand, dealerTotal = dealerAction(dealerHand, gameDeck)
         dealerTotal = int(dealerTotal)
         results = resolveGame(dealerTotal, gameHands[1:])
-        print(f'dealer endeed with {dealerTotal}')
-        print(results)
+
         #resolve dealer last card, 
         for i in range(len(gameHands)):
             gameHands[i] = sorted(gameHands[i], reverse=True)
-        print(gameHands)
         #print(estimate_decks_confidence(seen_cards, 10))
-        probabilites = estimate_decks_confidence(seen_cards,10)["probabilities"]
-        determine_action_odds(probabilites, seen_cards)
 
-        print(probabilites)
-        print(deckCount)
+        #print(probabilites)
+        #print(deckCount)
         if gameHands[0][1] in seen_cards:
             seen_cards[hiddenCard] += 1
         else:
             seen_cards[hiddenCard] = 1
             #False parameter is preset, changed to deal with ace H/L
         currentGame+=1
+    
+    quit
 
     #compare cards, determine split, determine soft or hard total, then determine action, take actinos as neceesary
 
@@ -282,4 +286,4 @@ def playGame(games):
 
     #compare hands and run simulation
 
-playGame(6)
+playGame(3)
