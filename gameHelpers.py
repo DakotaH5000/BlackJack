@@ -29,3 +29,18 @@ def build_game_deck(numDecks):
             for _ in range(numDecks):
                 availableCards.append(f'{key}{suit[0]}')
     return availableCards
+
+
+def trim_suit(hand):
+    for i in range(len(hand)):
+        try:
+            if isinstance(hand[i], str):
+                hand[i] = int(hand[i][:-1])  # Remove last character (suit)
+        #These errors should never be raised unless something is crazy broken
+        except ValueError:
+                raise ValueError(f"Cannot convert card value '{hand[i][:-1]}' to int")
+        except Exception as e:
+                # Catch unexpected errors and re-raise with context
+                raise RuntimeError(f"Error processing card '{hand[i]}': {e}")
+
+    return hand

@@ -5,7 +5,7 @@ import numpy as np
 import random
 from data.datatypes import cardsQuantity,cards,suits,letterToSuit,cardValues
 from gameAction import determinePlayerAction
-from gameHelpers import calculate_totals, build_game_deck
+from gameHelpers import calculate_totals, build_game_deck, trim_suit
 from calculateCurrentOdds import estimate_decks_confidence
 from calculatedOddsActions import determine_action_odds
 
@@ -81,13 +81,11 @@ def build_game_hands(gameCards):
 
 #Logic does not work with multiple aces, need fix
 def dealerAction(cards, deck):
-    print(cards)
     handTotal = 0
     while handTotal < 17:
         handTotal = calculate_totals(cards)
         if handTotal < 17:
             cards, deck = hit(cards, deck)
-            print(cards[-1])
             cards[-1] = int(cards[-1][:-1])
 
     return cards, handTotal
@@ -101,7 +99,6 @@ def doubleDown():
 def resolveGame(dealer, players):
     results= []
     dealerTotal = dealer
-    print(dealer, players)
     playerHands = players
     for hand in playerHands:
         playerTotal = calculate_totals(hand)
@@ -137,19 +134,6 @@ def hit(hand:list, cardsInDeck:list):
 
     return hand, cardsInDeck
 
-def trimSuit(hand):
-    for i in range(len(hand)):
-        try:
-            if isinstance(hand[i], str):
-                hand[i] = int(hand[i][:-1])  # Remove last character (suit)
-        #These errors should never be raised unless something is crazy broken
-        except ValueError:
-                raise ValueError(f"Cannot convert card value '{hand[i][:-1]}' to int")
-        except Exception as e:
-                # Catch unexpected errors and re-raise with context
-                raise RuntimeError(f"Error processing card '{hand[i]}': {e}")
-
-    return hand
 
     
 
@@ -215,13 +199,13 @@ def playGame(games):
             seen_cards[gameHands[0][0]] = 1
         
         readAbleHand = makeHumanReadable(gameHands)
-        dealerHand = trimSuit(gameHands[0])
+        dealerHand = trim_suit(gameHands[0])
         playerHands = gameHands[1:]
         dealerValue = dealerHand[0]
         #print(f'Dealer shows: {dealerValue}')
         #Stopping iteration at 0 results in dealers hand not being resolved in this set of game actions
         for i in range(len(playerHands)):
-            hand = trimSuit(playerHands[i])
+            hand = trim_suit(playerHands[i])
             sortedHand = sorted(hand, reverse=True)
 
             probabilites = estimate_decks_confidence(seen_cards,10)["probabilities"]
@@ -229,6 +213,8 @@ def playGame(games):
 
 
             action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
+            if int(computedAction) != int(action):
+                print(f'Differing actions, board says: {action}, computation says: {computedAction} for {sortedHand} vs {dealerValue}')
             if action == 1:
                 while action == 1:
                     hand, gameDeck = hit(sortedHand, gameDeck)
@@ -236,7 +222,7 @@ def playGame(games):
                         seen_cards[hand[-1]] += 1
                     else:
                         seen_cards[hand[-1]] = 1
-                    hand = trimSuit(hand)
+                    hand = trim_suit(hand)
                     sortedHand = sorted(hand, reverse=True)
                     action = determinePlayerAction(sortedHand, dealerValue, hardTotals, softTotals, splits)
                     gameHands[i] = sortedHand
@@ -286,4 +272,4 @@ def playGame(games):
 
     #compare hands and run simulation
 
-playGame(3)
+playGame(6)
